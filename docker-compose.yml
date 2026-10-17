@@ -1,0 +1,150 @@
+services:
+  postgres:
+    image: postgres:17
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-shop}
+
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.4.6-alpine
+
+    ports:
+      - "127.0.0.1:6379:6379"
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  user-migrate:
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
+    environment:
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql+psycopg://app:devpassword@postgres:5432/shop}
+      USER_SERVICE_DB_SCHEMA: ${USER_SERVICE_DB_SCHEMA:-user_service}
+    command:
+      - alembic
+      - -c
+      - services/user-service/alembic.ini
+      - upgrade
+      - head
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  order-migrate:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql+psycopg://app:devpassword@postgres:5432/shop}
+      ORDER_SERVICE_DB_SCHEMA: ${ORDER_SERVICE_DB_SCHEMA:-order_service}
+    command:
+      - alembic
+      - -c
+      - services/order-service/alembic.ini
+      - upgrade
+      - head
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  order-seed:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql+psycopg://app:devpassword@postgres:5432/shop}
+      ORDER_SERVICE_DB_SCHEMA: ${ORDER_SERVICE_DB_SCHEMA:-order_service}
+    command: ["python", "-m", "order_service.seed"]
+    depends_on:
+      order-migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  user-service:
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
+    environment:
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql+psycopg://app:devpassword@postgres:5432/shop}
+      USER_SERVICE_DB_SCHEMA: ${USER_SERVICE_DB_SCHEMA:-user_service}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      SLOW_QUERY_THRESHOLD_MS: ${SLOW_QUERY_THRESHOLD_MS:-500}
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      user-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql+psycopg://app:devpassword@postgres:5432/shop}
+      ORDER_SERVICE_DB_SCHEMA: ${ORDER_SERVICE_DB_SCHEMA:-order_service}
+      USER_SERVICE_URL: http://user-service:8001
+      USER_SERVICE_TIMEOUT_SECONDS: ${USER_SERVICE_TIMEOUT_SECONDS:-2.0}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_TIMEOUT_SECONDS: ${REDIS_TIMEOUT_SECONDS:-1.0}
+      PRODUCT_CACHE_TTL_SECONDS: ${PRODUCT_CACHE_TTL_SECONDS:-300}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      SLOW_QUERY_THRESHOLD_MS: ${SLOW_QUERY_THRESHOLD_MS:-500}
+    ports:
+      - "127.0.0.1:8002:8002"
+    depends_on:
+      order-seed:
+        condition: service_completed_successfully
+      user-service:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      user-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

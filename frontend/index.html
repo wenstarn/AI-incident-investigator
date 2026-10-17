@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Минималистичный интерфейс тестового магазина" />
+    <title>Incident Shop</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="config.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">AI Incident Investigator</p>
+        <h1>Incident Shop</h1>
+      </div>
+      <button id="refresh-products" class="button button-secondary" type="button">
+        Обновить товары
+      </button>
+    </header>
+
+    <main>
+      <section class="panel" aria-labelledby="users-heading">
+        <div class="section-heading">
+          <div>
+            <p class="section-index">01</p>
+            <h2 id="users-heading">Пользователи</h2>
+          </div>
+          <p>Создайте покупателя или найдите существующего.</p>
+        </div>
+
+        <div class="two-column">
+          <form id="create-user-form" class="form-card">
+            <h3>Новый пользователь</h3>
+            <label>
+              Имя
+              <input name="name" type="text" maxlength="255" required autocomplete="name" />
+            </label>
+            <label>
+              Email
+              <input name="email" type="email" required autocomplete="email" />
+            </label>
+            <button class="button" type="submit">Создать</button>
+            <div class="feedback" data-feedback="create-user" aria-live="polite"></div>
+          </form>
+
+          <form id="find-user-form" class="form-card">
+            <h3>Найти по ID</h3>
+            <label>
+              ID пользователя
+              <input name="userId" type="number" min="1" required inputmode="numeric" />
+            </label>
+            <button class="button" type="submit">Найти</button>
+            <div class="feedback" data-feedback="find-user" aria-live="polite"></div>
+            <div id="user-result" class="result-card" hidden></div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="products-heading">
+        <div class="section-heading">
+          <div>
+            <p class="section-index">02</p>
+            <h2 id="products-heading">Товары</h2>
+          </div>
+          <p>Актуальный каталог и остатки со склада.</p>
+        </div>
+        <div class="feedback" data-feedback="products" aria-live="polite"></div>
+        <div id="products-list" class="product-grid"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="orders-heading">
+        <div class="section-heading">
+          <div>
+            <p class="section-index">03</p>
+            <h2 id="orders-heading">Заказы</h2>
+          </div>
+          <p>Оформите покупку и посмотрите историю.</p>
+        </div>
+
+        <div class="two-column">
+          <form id="create-order-form" class="form-card">
+            <h3>Новый заказ</h3>
+            <label>
+              ID пользователя
+              <input name="userId" type="number" min="1" required inputmode="numeric" />
+            </label>
+            <label>
+              Товар
+              <select name="productId" required>
+                <option value="">Выберите товар</option>
+              </select>
+            </label>
+            <label>
+              Количество
+              <input name="quantity" type="number" min="1" value="1" required inputmode="numeric" />
+            </label>
+            <button class="button" type="submit">Создать заказ</button>
+            <div class="feedback" data-feedback="create-order" aria-live="polite"></div>
+          </form>
+
+          <form id="orders-history-form" class="form-card">
+            <h3>История заказов</h3>
+            <label>
+              ID пользователя
+              <input name="userId" type="number" min="1" required inputmode="numeric" />
+            </label>
+            <button class="button" type="submit">Показать историю</button>
+            <div class="feedback" data-feedback="orders-history" aria-live="polite"></div>
+          </form>
+        </div>
+        <div id="orders-list" class="order-list"></div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Локальный тестовый магазин</span>
+      <span id="api-status">API: localhost</span>
+    </footer>
+  </body>
+</html>
