@@ -15,6 +15,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY services/user-service/pyproject.toml services/user-service/pyproject.toml
 COPY services/order-service/pyproject.toml services/order-service/pyproject.toml
+COPY services/shared services/shared
 COPY services/order-service services/order-service
 
 RUN uv sync --frozen --no-dev --no-editable --package order-service \

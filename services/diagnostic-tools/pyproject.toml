@@ -1,0 +1,10 @@
+[project]
+name = "diagnostic-tools"
+version = "0.1.0"
+description = "Read-only diagnostic tools for AI Incident Investigator"
+requires-python = ">=3.12"
+dependencies = ["httpx>=0.28,<1", "pydantic>=2.10,<3", "psycopg[binary]>=3.2,<4", "redis>=5.2,<6"]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"

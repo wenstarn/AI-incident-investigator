@@ -4,13 +4,16 @@ version = "0.1.0"
 description = "Incident Controller for AI Incident Investigator"
 requires-python = ">=3.12"
 dependencies = [
-    "docker>=7.1,<8",
+    "httpx>=0.28,<1",
     "fastapi>=0.115,<1",
     "uvicorn>=0.34,<1",
 ]
 
+[project.optional-dependencies]
+executor = ["docker>=7.1,<8"]
+
 [dependency-groups]
-dev = ["httpx>=0.28,<1", "pytest>=8.3,<10", "ruff>=0.14,<1"]
+dev = ["docker>=7.1,<8", "httpx>=0.28,<1", "pytest>=8.3,<10", "ruff>=0.14,<1"]
 
 [build-system]
 requires = ["uv_build>=0.13,<0.14"]
@@ -24,4 +27,6 @@ line-length = 88
 select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
+addopts = '-m "not destructive"'
+markers = ["destructive: stops running Compose services"]
 testpaths = ["tests"]

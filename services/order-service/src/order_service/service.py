@@ -1,14 +1,17 @@
+from collections.abc import Iterator
 from typing import Annotated
+from urllib.parse import urlsplit
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from order_service.cache import ProductCache
 from order_service.config import get_product_cache_ttl
 from order_service.database import get_session, log_database_error
+from order_service.effective_config import effective_redis_url
 from order_service.models import OrderModel
-from order_service.redis_client import get_redis_client
+from order_service.redis_client import create_redis_client, get_redis_client
 from order_service.repository import OrderRepository
 from order_service.schemas import Order, OrderCreate, Product, SortOrder
 from order_service.user_client import UserServiceClient, get_user_service_client
@@ -120,8 +123,20 @@ class OrderService:
 
 
 def get_order_service(
+    request: Request,
     session: Annotated[Session, Depends(get_session)],
     user_client: Annotated[UserServiceClient, Depends(get_user_service_client)],
-) -> OrderService:
-    cache = ProductCache(get_redis_client(), get_product_cache_ttl())
-    return OrderService(session, user_client, cache)
+) -> Iterator[OrderService]:
+    fault = request.app.state.fault_registry.get_fault_by_type("redis_url_override")
+    url = effective_redis_url(request)
+    redis_client = create_redis_client(url) if fault else get_redis_client()
+    try:
+        target = "redis"
+        if fault:
+            parsed = urlsplit(url)
+            target = f"{parsed.hostname}:{parsed.port}"
+        cache = ProductCache(redis_client, get_product_cache_ttl(), target=target)
+        yield OrderService(session, user_client, cache)
+    finally:
+        if fault:
+            redis_client.close()

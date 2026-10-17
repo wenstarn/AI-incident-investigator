@@ -78,6 +78,9 @@ class Metrics:
         self._errors_total = 0
         self._cache_hits = 0
         self._cache_misses = 0
+        self._dependency_timeouts = 0
+        self._dependency_errors = 0
+        self._redis_connection_errors = 0
 
     def record_request(self) -> None:
         with self._lock:
@@ -95,6 +98,18 @@ class Metrics:
         with self._lock:
             self._cache_misses += 1
 
+    def record_dependency_timeout(self) -> None:
+        with self._lock:
+            self._dependency_timeouts += 1
+
+    def record_dependency_error(self) -> None:
+        with self._lock:
+            self._dependency_errors += 1
+
+    def record_redis_connection_error(self) -> None:
+        with self._lock:
+            self._redis_connection_errors += 1
+
     def snapshot(self) -> dict[str, int]:
         with self._lock:
             return {
@@ -102,6 +117,9 @@ class Metrics:
                 "errors_total": self._errors_total,
                 "cache_hits": self._cache_hits,
                 "cache_misses": self._cache_misses,
+                "dependency_timeouts_total": self._dependency_timeouts,
+                "dependency_errors_total": self._dependency_errors,
+                "redis_connection_errors_total": self._redis_connection_errors,
             }
 
 

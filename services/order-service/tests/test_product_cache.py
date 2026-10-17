@@ -81,6 +81,23 @@ def test_redis_read_error_falls_back_to_database(error: Exception) -> None:
     assert result.stock == 7
 
 
+def test_redis_override_failure_has_structured_target(monkeypatch) -> None:
+    from order_service import cache as cache_module
+
+    recorded = Mock()
+    monkeypatch.setattr(cache_module.logger, "error", recorded)
+    redis_client = Mock()
+    redis_client.get.side_effect = RedisConnectionError("unavailable")
+    cache = ProductCache(redis_client, ttl_seconds=300, target="redis:9999")
+
+    assert cache.get(42) is None
+    assert recorded.call_args.kwargs["extra"] == {
+        "event": "redis_connection_failed",
+        "operation": "read",
+        "target": "redis:9999",
+    }
+
+
 def test_redis_write_error_does_not_fail_request() -> None:
     redis_client = Mock()
     redis_client.get.return_value = None

@@ -273,13 +273,19 @@ name = "incident-controller"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "docker" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+executor = [
+    { name = "docker" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "docker" },
     { name = "httpx" },
     { name = "pytest" },
     { name = "ruff" },
@@ -287,13 +293,16 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "docker", specifier = ">=7.1,<8" },
+    { name = "docker", marker = "extra == 'executor'", specifier = ">=7.1,<8" },
     { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "uvicorn", specifier = ">=0.34,<1" },
 ]
+provides-extras = ["executor"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "docker", specifier = ">=7.1,<8" },
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "pytest", specifier = ">=8.3,<10" },
     { name = "ruff", specifier = ">=0.14,<1" },

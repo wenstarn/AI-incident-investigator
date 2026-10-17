@@ -35,13 +35,13 @@ uv sync --all-packages
 Создайте локальный файл настроек и запустите весь стек одной командой:
 
 ```bash
-cp .env.example .env
+test -f .env || cp .env.example .env
 make up
 ```
 
 Docker Compose собирает образы, дожидается PostgreSQL, применяет миграции обеих
 схем, идемпотентно добавляет начальный каталог и запускает API с frontend.
-Incident Controller запускается отдельно на хосте и не входит в Compose.
+Incident Controller и внутренний Docker Executor также запускаются через Compose.
 Магазин доступен на `http://localhost:3000`. Backend также опубликован только
 на loopback-интерфейсе: User Service на `http://localhost:8001`, Order Service
 на `http://localhost:8002`.
@@ -59,33 +59,56 @@ make down     # остановка без удаления postgres_data
 заказы и товары сохраняются между запусками. Не используйте
 `docker compose down -v`, если эти данные нужны.
 
-## Incident Controller
+## Running and Testing Incidents
 
-После запуска магазина через Compose запустите контроллер на хосте:
-
-```bash
-cd services/incident-controller
-uv sync --frozen
-INCIDENT_COMPOSE_PROJECT=ai-incident-investigator uv run uvicorn incident_controller.main:app --host 127.0.0.1 --port 8003 --workers 1
-```
-
-`INCIDENT_COMPOSE_PROJECT` должен совпадать с именем Compose-проекта
-(`docker compose config --format json` показывает поле `name`). Можно также
-использовать `COMPOSE_PROJECT_NAME`. Контроллер выбирает контейнеры только по
-labels проекта и сервисов `user-service` или `redis`; доступ к Docker API
-нужен процессу на хосте. API доступен только локально на `127.0.0.1:8003`.
+Clone the repository, create `.env`, and generate three **different** secrets:
 
 ```bash
-curl http://127.0.0.1:8003/incidents
-curl -X POST http://127.0.0.1:8003/incidents/INC-001/activate
-curl http://127.0.0.1:8003/incidents/active
-curl -X POST http://127.0.0.1:8003/incidents/active/reset
+git clone <repository-url> AI-incident-investigator
+cd AI-incident-investigator
+cp .env.example .env
+# Generate three values with: openssl rand -hex 32
+# Set FAULT_INJECTION_TOKEN, INCIDENT_CONTROLLER_TOKEN, DOCKER_EXECUTOR_TOKEN in .env.
+make up
 ```
 
-`INC-001` останавливает User Service, `INC-002` останавливает Redis. Сброс
-запускает только контейнер, остановленный контроллером. Активный сценарий и ID
-контейнера хранятся в памяти, поэтому перед завершением контроллера выполните
-reset. После перезапуска контроллер не восстановит прежнее состояние.
+The frontend is at `http://127.0.0.1:3000`; User Service, Order Service,
+and Incident Controller listen on loopback ports 8001, 8002, and 8003.
+`GET /health` on port 8003 needs no token. All other controller routes require
+`INCIDENT_CONTROLLER_TOKEN`; the Makefile reads it from `.env` without printing it.
+
+```bash
+make incident-list
+make incident-activate ID=INC-001
+make incident-status
+make incident-logs     # Ctrl+C to stop following logs
+make incident-reset
+make incident-test     # intentionally disrupts the running local stack
+make down              # preserves the PostgreSQL volume
+```
+
+Repeat activate/status/reset with each ID. `make incident-test` runs the six
+scenarios in sequence, restores each one, and verifies that a second reset is
+safe. It creates one test user and leaves that record in PostgreSQL. Ordinary
+`make test` does not run these destructive tests.
+
+| ID | Fault | Expected symptom |
+|---|---|---|
+| INC-001 | User Service stopped | User health unavailable; order creation fails |
+| INC-002 | Redis stopped | Cache health fails; product reads use PostgreSQL fallback |
+| INC-003 | PostgreSQL stopped | Database health fails in both services |
+| INC-004 | Wrong User Service port | Order creation returns 502 |
+| INC-005 | Slow User Service | Order creation returns 504 |
+| INC-006 | Wrong Redis port | Redis container stays healthy; product reads fall back to PostgreSQL |
+
+Docker Executor is reachable only on a private Compose network shared with
+Incident Controller. It accepts only status, stop, start, and health-wait
+operations for `user-service`, `redis`, and `postgres`, selected by labels of
+the current Compose project. The controller has no Docker socket mount.
+The executor **does** mount the Docker socket, which grants it high privileges
+on the Docker host. Use this stack only in a trusted local test environment;
+never expose the executor or controller to an untrusted network. Controller
+state is in memory, so reset an active incident before recreating it.
 
 Быстрые проверки после запуска:
 
@@ -452,3 +475,13 @@ curl http://localhost:8002/internal/stats
 зависимости. Корневой `pyproject.toml` объединяет их в единый uv Workspace,
 хранит общие dev-зависимости и конфигурацию инструментов. Во всём репозитории
 используются одно корневое виртуальное окружение и один `uv.lock`.
+## Runtime fault injection: INC-004–006
+
+The protected internal fault APIs keep their in-memory registries and use
+`FAULT_INJECTION_TOKEN`. INC-004 changes Order Service's User Service URL,
+INC-005 delays User Service lookups, and INC-006 changes Order Service's Redis
+URL. The controller reaches both services by Docker DNS. Incidents INC-004–INC-006 have no expiry and remain active until
+`make incident-reset`. Their settings are process-local, so restarting the
+affected service also clears them. Direct fault API requests retain their
+default 300-second TTL unless they explicitly send `ttl_seconds: null`. Use
+`USER_SERVICE_TIMEOUT_SECONDS` below five seconds for the INC-005 timeout.

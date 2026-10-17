@@ -19,6 +19,27 @@ services:
       timeout: 5s
       retries: 5
 
+  diagnostic-db-init:
+    image: postgres:17
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      READER_PASSWORD: ${DIAGNOSTIC_POSTGRES_PASSWORD:-}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-shop}
+    volumes:
+      - ./infrastructure/diagnostic-reader.sql:/diagnostic-reader.sql:ro
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        test -n "$$READER_PASSWORD" &&
+        psql -h postgres -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+        -v reader_password="$$READER_PASSWORD" -v ON_ERROR_STOP=1
+        -f /diagnostic-reader.sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   redis:
     image: redis:7.4.6-alpine
 
@@ -85,6 +106,7 @@ services:
       context: .
       dockerfile: services/user-service/Dockerfile
     environment:
+      FAULT_INJECTION_TOKEN: ${FAULT_INJECTION_TOKEN:-}
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql+psycopg://app:devpassword@postgres:5432/shop}
       USER_SERVICE_DB_SCHEMA: ${USER_SERVICE_DB_SCHEMA:-user_service}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -107,6 +129,8 @@ services:
       context: .
       dockerfile: services/order-service/Dockerfile
     environment:
+      FAULT_INJECTION_TOKEN: ${FAULT_INJECTION_TOKEN:-}
+      DIAGNOSTICS_TOKEN: ${DIAGNOSTICS_TOKEN:-}
       DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgresql+psycopg://app:devpassword@postgres:5432/shop}
       ORDER_SERVICE_DB_SCHEMA: ${ORDER_SERVICE_DB_SCHEMA:-order_service}
       USER_SERVICE_URL: http://user-service:8001
@@ -146,5 +170,101 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  incident-controller:
+    build:
+      context: .
+      dockerfile: services/incident-controller/Dockerfile
+    environment:
+      INCIDENT_CONTROLLER_TOKEN: ${INCIDENT_CONTROLLER_TOKEN:-}
+      DOCKER_EXECUTOR_TOKEN: ${DOCKER_EXECUTOR_TOKEN:-}
+      DOCKER_EXECUTOR_URL: http://docker-executor:8004
+      FAULT_INJECTION_TOKEN: ${FAULT_INJECTION_TOKEN:-}
+      USER_SERVICE_INTERNAL_URL: http://user-service:8001
+      ORDER_SERVICE_INTERNAL_URL: http://order-service:8002
+      INCIDENT_USER_DB_HEALTH_URL: http://user-service:8001/health/db
+      INCIDENT_ORDER_DB_HEALTH_URL: http://order-service:8002/health/db
+      INCIDENT_POSTGRES_RECOVERY_TIMEOUT_SECONDS: ${INCIDENT_POSTGRES_RECOVERY_TIMEOUT_SECONDS:-60}
+      INCIDENT_HEALTH_REQUEST_TIMEOUT_SECONDS: ${INCIDENT_HEALTH_REQUEST_TIMEOUT_SECONDS:-2}
+      INCIDENT_BAD_USER_SERVICE_URL: ${INCIDENT_BAD_USER_SERVICE_URL:-http://user-service:9999}
+      INCIDENT_BAD_REDIS_URL: ${INCIDENT_BAD_REDIS_URL:-redis://redis:9999/0}
+    ports:
+      - "127.0.0.1:8003:8003"
+    networks:
+      - default
+      - executor
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  docker-executor:
+    build:
+      context: .
+      dockerfile: services/incident-controller/Dockerfile.executor
+    environment:
+      DOCKER_EXECUTOR_TOKEN: ${DOCKER_EXECUTOR_TOKEN:-}
+      DOCKER_EXECUTOR_READ_TOKEN: ${DOCKER_EXECUTOR_READ_TOKEN:-}
+      INCIDENT_COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-ai-incident-investigator}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - executor
+      - diagnostic_access
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  diagnostic-test-runner:
+    profiles: ["diagnostic-test"]
+    build:
+      context: .
+      dockerfile: services/diagnostic-tools/Dockerfile.test
+    environment:
+      USER_SERVICE_URL: http://user-service:8001
+      ORDER_SERVICE_URL: http://order-service:8002
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-shop}
+      DIAGNOSTIC_POSTGRES_USER: diagnostic_reader
+      DIAGNOSTIC_POSTGRES_PASSWORD: ${DIAGNOSTIC_POSTGRES_PASSWORD:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DOCKER_EXECUTOR_READ_URL: http://docker-executor:8004
+      DOCKER_EXECUTOR_READ_TOKEN: ${DOCKER_EXECUTOR_READ_TOKEN:-}
+      DIAGNOSTICS_TOKEN: ${DIAGNOSTICS_TOKEN:-}
+      INCIDENT_CONTROLLER_URL: http://incident-controller:8003
+      INCIDENT_CONTROLLER_TOKEN: ${INCIDENT_CONTROLLER_TOKEN:-}
+    networks:
+      - default
+      - executor
+    depends_on:
+      - incident-controller
+      - docker-executor
+      - diagnostic-db-init
+    restart: "no"
+
+  diagnostic-proxy:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./infrastructure/diagnostic-proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:8005:8080"
+    networks:
+      - diagnostic_access
+    depends_on:
+      - docker-executor
+    restart: unless-stopped
+
+networks:
+  executor:
+    internal: true
+  diagnostic_access: {}
+
 volumes:
   postgres_data:
+

@@ -9,6 +9,8 @@ dev = [
 members = [
     "services/user-service",
     "services/order-service",
+    "services/shared",
+    "services/diagnostic-tools",
 ]
 
 [tool.ruff]
@@ -24,6 +26,8 @@ markers = [
     "integration: requires PostgreSQL or Redis through TEST_DATABASE_URL/TEST_REDIS_URL",
 ]
 testpaths = [
+    "services/shared/tests",
+    "services/diagnostic-tools/tests",
     "services/user-service/tests",
     "services/order-service/tests",
 ]

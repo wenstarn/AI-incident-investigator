@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "User service for AI Incident Investigator"
 requires-python = ">=3.12"
 dependencies = [
+    "fault-injection",
     "alembic>=1.14,<2",
     "fastapi>=0.115,<1",
     "pydantic[email]>=2.10,<3",
@@ -15,3 +16,6 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.13,<0.14"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+fault-injection = { workspace = true }

@@ -6,10 +6,12 @@ from pathlib import Path
 from uuid import uuid4
 
 import httpx
+import order_service.service as order_service_module
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from fault_injection.models import FaultCreate
 from order_service.config import DEFAULT_DATABASE_SCHEMA
 from order_service.database import get_session
 from order_service.main import app, get_database_health_checker
@@ -83,7 +85,20 @@ def session_factory(
 @pytest.fixture
 def client(
     session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[TestClient]:
+    class TestCache:
+        def __init__(self) -> None:
+            self.values: dict[str, str] = {}
+
+        def get(self, key: str) -> str | None:
+            return self.values.get(key)
+
+        def set(self, key: str, value: str, ex: int) -> None:
+            self.values[key] = value
+
+    monkeypatch.setattr(order_service_module, "get_redis_client", TestCache)
+
     def session_dependency() -> Iterator[Session]:
         with session_factory() as session:
             yield session
@@ -109,6 +124,26 @@ def add_product(factory: sessionmaker[Session], stock: int = 10) -> ProductModel
         session.commit()
         session.refresh(product)
         return product
+
+
+@pytest.mark.integration
+def test_redis_url_fault_falls_back_and_resets(
+    client: TestClient, session_factory: sessionmaker[Session]
+) -> None:
+    product = add_product(session_factory)
+    fault = app.state.fault_registry.set_fault(
+        FaultCreate(
+            type="redis_url_override",
+            parameters={"url": "redis://127.0.0.1:9999/0"},
+        )
+    )
+    try:
+        response = client.get(f"/products/{product.id}")
+        assert response.status_code == 200
+        assert response.json()["stock"] == product.stock
+    finally:
+        app.state.fault_registry.remove_fault(fault.fault_id)
+    assert client.get(f"/products/{product.id}").status_code == 200
 
 
 @pytest.mark.integration

@@ -1,5 +1,8 @@
 import httpx
 import pytest
+from fastapi import Request
+from fault_injection.models import FaultCreate
+from order_service.main import app
 from order_service.observability import reset_request_id, set_request_id
 from order_service.user_client import (
     UnexpectedUserServiceResponseError,
@@ -7,7 +10,34 @@ from order_service.user_client import (
     UserServiceClient,
     UserServiceTimeoutError,
     UserServiceUnavailableError,
+    get_user_service_client,
 )
+
+
+def test_runtime_user_service_url_override(monkeypatch) -> None:
+    monkeypatch.setenv("USER_SERVICE_URL", "http://user-service:8001")
+    fault = app.state.fault_registry.set_fault(
+        FaultCreate(
+            type="user_service_url_override",
+            parameters={"url": "http://user-service:9999"},
+        )
+    )
+    request = Request({"type": "http", "app": app})
+    try:
+        dependency = get_user_service_client(request)
+        try:
+            client = next(dependency)
+            assert str(client._client.base_url) == "http://user-service:9999"
+        finally:
+            dependency.close()
+    finally:
+        app.state.fault_registry.remove_fault(fault.fault_id)
+    dependency = get_user_service_client(request)
+    try:
+        client = next(dependency)
+        assert str(client._client.base_url) == "http://user-service:8001"
+    finally:
+        dependency.close()
 
 
 def make_client(handler: httpx.MockTransport) -> UserServiceClient:

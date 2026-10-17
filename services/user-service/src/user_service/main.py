@@ -1,10 +1,13 @@
 import logging
+import time
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fault_injection.registry import FaultRegistry
+from fault_injection.router import create_fault_router
 from sqlalchemy.exc import SQLAlchemyError
 
 from user_service.config import get_cors_allowed_origins
@@ -34,6 +37,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="User Service", lifespan=lifespan)
+app.state.fault_registry = FaultRegistry({"request_delay"})
+app.include_router(create_fault_router())
 install_http_observability(app)
 app.add_middleware(
     CORSMiddleware,
@@ -109,8 +114,17 @@ def create_user(
 @app.get("/users/{user_id}", response_model=User)
 def get_user(
     user_id: int,
+    request: Request,
     service: Annotated[UserService, Depends(get_user_service)],
 ) -> User:
+    fault = request.app.state.fault_registry.get_fault_by_type("request_delay")
+    if fault is not None:
+        delay_ms = fault.parameters["delay_ms"]
+        logger.warning(
+            "User lookup delayed by runtime fault",
+            extra={"event": "fault_injection_applied", "operation": "get_user"},
+        )
+        time.sleep(delay_ms / 1000)
     try:
         return service.get_user(user_id)
     except UserNotFoundError as error:

@@ -19,9 +19,10 @@ class CachedProduct:
 
 
 class ProductCache:
-    def __init__(self, client: Redis, ttl_seconds: int) -> None:
+    def __init__(self, client: Redis, ttl_seconds: int, target: str = "redis") -> None:
         self._client = client
         self._ttl_seconds = ttl_seconds
+        self._target = target
 
     def get(self, product_id: int) -> CachedProduct | None:
         try:
@@ -57,10 +58,14 @@ class ProductCache:
     def _key(product_id: int) -> str:
         return f"product:{product_id}"
 
-    @staticmethod
-    def _log_failure(operation: str, error: Exception) -> None:
+    def _log_failure(self, operation: str, error: Exception) -> None:
+        metrics.record_redis_connection_error()
         logger.error(
             "Redis cache operation failed",
-            extra={"event": "redis_connection_failed", "operation": operation},
+            extra={
+                "event": "redis_connection_failed",
+                "operation": operation,
+                "target": self._target,
+            },
             exc_info=error,
         )

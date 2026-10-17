@@ -13,7 +13,9 @@ def client():
     service = IncidentController([DummyScenario()])
     app.dependency_overrides[get_controller] = lambda: service
     try:
-        with TestClient(app) as test_client:
+        with TestClient(
+            app, headers={"X-Incident-Token": "unit-test-controller-token"}
+        ) as test_client:
             yield test_client
     finally:
         app.dependency_overrides.clear()
@@ -64,7 +66,9 @@ def test_failed_activation_does_not_claim_active_slot():
     service = IncidentController([FailingScenario()])
     app.dependency_overrides[get_controller] = lambda: service
     try:
-        with TestClient(app) as test_client:
+        with TestClient(
+            app, headers={"X-Incident-Token": "unit-test-controller-token"}
+        ) as test_client:
             response = test_client.post("/incidents/dummy/activate")
             assert response.status_code == 500
             assert response.json() == {"detail": "Activation failed"}
@@ -81,7 +85,9 @@ def test_failed_reset_retains_active_incident():
     service = IncidentController([FailingResetScenario()])
     app.dependency_overrides[get_controller] = lambda: service
     try:
-        with TestClient(app) as test_client:
+        with TestClient(
+            app, headers={"X-Incident-Token": "unit-test-controller-token"}
+        ) as test_client:
             assert test_client.post("/incidents/dummy/activate").status_code == 200
             response = test_client.post("/incidents/active/reset")
             assert response.status_code == 500
@@ -90,3 +96,24 @@ def test_failed_reset_retains_active_incident():
             assert active["incident"]["id"] == "dummy"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_controller_requires_token_and_keeps_health_public(monkeypatch):
+    monkeypatch.setenv("INCIDENT_CONTROLLER_TOKEN", "controller-secret")
+    with TestClient(app) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/incidents").status_code == 403
+        assert (
+            client.get("/incidents", headers={"X-Incident-Token": "wrong"}).status_code
+            == 403
+        )
+    monkeypatch.delenv("INCIDENT_CONTROLLER_TOKEN")
+    with TestClient(app) as client:
+        assert client.get("/incidents").status_code == 503
+
+
+def test_controller_rejects_reused_secret(monkeypatch):
+    monkeypatch.setenv("INCIDENT_CONTROLLER_TOKEN", "shared-secret")
+    monkeypatch.setenv("DOCKER_EXECUTOR_TOKEN", "shared-secret")
+    with TestClient(app, headers={"X-Incident-Token": "shared-secret"}) as client:
+        assert client.get("/incidents").status_code == 503

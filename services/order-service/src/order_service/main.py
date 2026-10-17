@@ -5,12 +5,15 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fault_injection.registry import FaultRegistry
+from fault_injection.router import create_fault_router
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 from sqlalchemy.exc import SQLAlchemyError
 
 from order_service.config import get_cors_allowed_origins
 from order_service.database import check_database, get_pool_stats, log_database_error
+from order_service.diagnostics import router as diagnostics_router
 from order_service.observability import (
     configure_logging,
     install_http_observability,
@@ -45,6 +48,11 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Order Service", lifespan=lifespan)
+app.state.fault_registry = FaultRegistry(
+    {"request_delay", "user_service_url_override", "redis_url_override"}
+)
+app.include_router(create_fault_router())
+app.include_router(diagnostics_router)
 install_http_observability(app)
 app.add_middleware(
     CORSMiddleware,

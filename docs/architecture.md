@@ -217,6 +217,9 @@ Redis используется только как кеш, **не как ист�
 | `redis_down` | Остановлен Redis | Товары продолжают открываться через БД; ошибки кеша | Логи, `inspect_redis`, stats | Недоступный кеш, graceful degradation |
 | `slow_sql` | Медленный запрос списка заказов, например из-за отсутствия подходящего индекса | `GET /orders?user_id=...` медленный | HTTP duration в логах, `db_query_slow`, `EXPLAIN` | Неэффективный план запроса |
 | `db_pool_exhaustion` | Соединения удерживаются, пул Order Service исчерпан | Под нагрузкой 500/таймауты при работающей БД | Логи `db_pool_timeout`, `/internal/stats`, `inspect_database` | Исчерпание пула соединений |
+| `INC-004` | Неверный порт User Service через runtime fault Order Service | `POST /orders` → 502, User Service работает | `dependency_connection_failed`, health | Ошибка адреса зависимости |
+| `INC-005` | Задержка 5000 мс для `GET /users/{id}` через runtime fault User Service | `POST /orders` → 504, health быстрый | `fault_injection_applied`, timeout Order Service | Медленный ответ User Service |
+| `INC-006` | Неверный Redis endpoint через runtime fault Order Service | Карточка товара доступна через PostgreSQL | `redis_connection_failed`, health Redis | Ошибка адреса кеша |
 
 **Примечания к воспроизводимости:**
 - Неверный пароль должен применяться к новым подключениям: существующие открытые соединения нужно корректно закрыть/пересоздать в тестовом сценарии.

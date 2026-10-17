@@ -130,6 +130,36 @@ def test_get_user(client: TestClient) -> None:
     assert response.json() == created_user
 
 
+def test_runtime_delay_only_affects_user_lookup(
+    client: TestClient, monkeypatch
+) -> None:
+    from unittest.mock import Mock
+
+    from fault_injection.models import FaultCreate
+    from user_service import main
+
+    observed = []
+    warning = Mock()
+    monkeypatch.setattr(main.logger, "warning", warning)
+    monkeypatch.setattr(main.time, "sleep", observed.append)
+    created = client.post(
+        "/users", json={"name": "Alice", "email": "alice@example.com"}
+    ).json()
+    fault = app.state.fault_registry.set_fault(
+        FaultCreate(type="request_delay", parameters={"delay_ms": 5000})
+    )
+    try:
+        assert client.get("/health").status_code == 200
+        assert observed == []
+        assert client.get(f"/users/{created['id']}").status_code == 200
+        assert observed == [5.0]
+        assert warning.call_args.kwargs["extra"]["event"] == "fault_injection_applied"
+    finally:
+        app.state.fault_registry.remove_fault(fault.fault_id)
+    assert client.get(f"/users/{created['id']}").status_code == 200
+    assert observed == [5.0]
+
+
 def test_get_missing_user(client: TestClient) -> None:
     response = client.get("/users/999")
     assert response.status_code == 404
