@@ -6,7 +6,7 @@ export
 endif
 
 setup:
-	@python3 scripts/setup_env.py
+	@uv run python scripts/setup_env.py
 
 install:
 	uv sync --all-packages

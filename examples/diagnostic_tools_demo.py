@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import sys
 from pathlib import Path
 
 from diagnostic_tools import (
@@ -81,4 +82,6 @@ async def main() -> None:
 
 if __name__ == "__main__":
     load_demo_env()
-    asyncio.run(main())
+    # Psycopg async connections cannot use Windows' default ProactorEventLoop.
+    loop_factory = asyncio.SelectorEventLoop if sys.platform == "win32" else None
+    asyncio.run(main(), loop_factory=loop_factory)

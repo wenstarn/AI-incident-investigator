@@ -17,6 +17,22 @@ uv run --package diagnostic-tools python examples/diagnostic_tools_demo.py
 
 Если Docker Compose использует ранее созданный том PostgreSQL, его существующий административный пароль должен совпадать с текущей конфигурацией: `make setup` его не заменяет. Подробности настроек, ошибок и тестов приведены ниже.
 
+На Windows пример явно использует `SelectorEventLoop`: асинхронный psycopg
+несовместим со стандартным для Windows `ProactorEventLoop`. Без этой настройки
+`check_postgres()` может сразу вернуть `dependency_error`, даже если PostgreSQL
+работает. В собственных скриптах с `check_postgres()` используйте такой же запуск
+(Python 3.12+):
+
+```python
+import asyncio
+import sys
+
+loop_factory = asyncio.SelectorEventLoop if sys.platform == "win32" else None
+asyncio.run(main(), loop_factory=loop_factory)
+```
+
+Ограничение описано в [документации psycopg](https://www.psycopg.org/psycopg3/docs/advanced/async.html).
+
 ## Проверка на инциденте
 
 После быстрого запуска можно включить один из тестовых инцидентов и повторить диагностику. Например, для остановки User Service:
