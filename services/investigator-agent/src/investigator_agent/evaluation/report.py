@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-SYSTEM_NAMES = {"single": "Одиночный агент", "mas": "MAS"}
+SYSTEM_NAMES = {"llm_only": "Только LLM", "single": "Одиночный агент", "mas": "MAS"}
 
 
 class EvalRun(BaseModel):
@@ -22,8 +22,13 @@ class EvalRun(BaseModel):
     scores: list[dict[str, Any]]
 
     @property
+    def mode(self) -> str:
+        mode = self.meta.get("mode", "?")
+        return f"{mode} · generic" if self.meta.get("symptoms") == "generic" else mode
+
+    @property
     def label(self) -> str:
-        return f"{self.meta.get('model') or '?'} · {self.meta.get('mode', '?')}"
+        return f"{self.meta.get('model') or '?'} · {self.mode}"
 
 
 def load_runs(root: Path) -> list[EvalRun]:
@@ -94,7 +99,7 @@ def build_report(runs: list[EvalRun], generated_at: datetime | None = None) -> s
     for run in runs:
         for system, total in _by_system(run).items():
             lines.append(
-                f"| {run.name} | {run.meta.get('model')} | {run.meta.get('mode')} "
+                f"| {run.name} | {run.meta.get('model')} | {run.mode} "
                 f"| {run.meta.get('repeats')} | {SYSTEM_NAMES.get(system, system)} "
                 f"| {total['correct']}/{total['runs']} "
                 f"| {total['grounded']}/{total['runs']} "

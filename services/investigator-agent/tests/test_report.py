@@ -22,10 +22,12 @@ def score(case_id, system, correct=True, repeat=1, tokens=100, duration=10.0):
     }
 
 
-def write_run(root, name, model, mode, scores):
+def write_run(root, name, model, mode, scores, symptoms=None):
     folder = root / name
     folder.mkdir(parents=True)
     meta = {"mode": mode, "model": model, "systems": "single,mas", "repeats": 1}
+    if symptoms:
+        meta["symptoms"] = symptoms
     (folder / "scores.json").write_text(json.dumps({"meta": meta, "scores": scores}))
 
 
@@ -66,6 +68,20 @@ def test_report_is_computed_from_score_files(tmp_path):
     )
     assert "| 20261018T110000Z-live | model-b | live | 1 | MAS | 0/1 |" in report
     assert "### 20261018T100000Z-replay" in report
+
+
+def test_generic_symptom_runs_are_marked(tmp_path):
+    write_run(
+        tmp_path,
+        "20261018T120000Z-replay",
+        "model-a",
+        "replay",
+        [score("INC-002", "single"), score("INC-002", "mas")],
+        symptoms="generic",
+    )
+    report = build_report(load_runs(tmp_path))
+    assert "| model-a | replay · generic | 1 | Одиночный агент |" in report
+    assert "| model-a · replay · generic | 1/1 | 1/1 |" in report
 
 
 def test_empty_results_and_file_output(tmp_path):

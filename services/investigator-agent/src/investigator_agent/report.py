@@ -76,7 +76,7 @@ def inconclusive_report(reason: str) -> IncidentReport:
 
 
 class InvestigationResult(BaseModel):
-    system: Literal["single", "mas"]
+    system: Literal["llm_only", "single", "mas"]
     symptom: str
     # Where the tools pointed: the live stack or a replay world (set by caller).
     source: Literal["live", "replay"] | None = None

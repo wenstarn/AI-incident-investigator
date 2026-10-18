@@ -108,6 +108,21 @@ proven (or the system is healthy), call submit_report.
 {REPORT_RULES}
 {LANGUAGE_RULE}"""
 
+# Baseline without tools: the same system description and report rules, but no
+# tool notes and no method, since both are about working with tools.
+LLM_ONLY_PROMPT = f"""\
+ROLE: llm-only
+You are an SRE incident investigator without access to the system: you cannot
+run checks, read logs or see metrics. Name the most likely root cause using only
+the symptom report and the system description, and call submit_report. Use
+category=unknown only if no cause is more likely than the others. Set confidence
+to reflect that nothing was verified. Leave evidence empty: you have no
+observations.
+
+{SYSTEM_TOPOLOGY}
+{REPORT_RULES}
+{LANGUAGE_RULE}"""
+
 COORDINATOR_TRIAGE_PROMPT = f"""\
 ROLE: coordinator-triage
 You coordinate an incident investigation team. You may look at container states

@@ -98,6 +98,7 @@ def test_llm_failure_is_reported():
 def test_prompts_do_not_leak_scenarios_or_controller():
     texts = [
         prompts.SINGLE_AGENT_PROMPT,
+        prompts.LLM_ONLY_PROMPT,
         prompts.COORDINATOR_TRIAGE_PROMPT,
         prompts.COORDINATOR_SYNTHESIS_PROMPT,
         prompts.CRITIC_PROMPT,
