@@ -35,9 +35,14 @@ uv sync --all-packages
 Создайте локальный файл настроек и запустите весь стек одной командой:
 
 ```bash
-test -f .env || cp .env.example .env
+make setup
 make up
 ```
+
+`make setup` создаёт `.env` из `.env.example`, если файла нет, и заполняет
+только пустые диагностические и управляющие токены криптографически случайными
+значениями. Повторный запуск сохраняет существующие значения, включая пароль
+PostgreSQL. Команда не запускает Docker и не устанавливает зависимости.
 
 Docker Compose собирает образы, дожидается PostgreSQL, применяет миграции обеих
 схем, идемпотентно добавляет начальный каталог и запускает API с frontend.
@@ -61,14 +66,12 @@ make down     # остановка без удаления postgres_data
 
 ## Running and Testing Incidents
 
-Clone the repository, create `.env`, and generate three **different** secrets:
+Clone the repository and prepare `.env` with distinct local credentials:
 
 ```bash
 git clone <repository-url> AI-incident-investigator
 cd AI-incident-investigator
-cp .env.example .env
-# Generate three values with: openssl rand -hex 32
-# Set FAULT_INJECTION_TOKEN, INCIDENT_CONTROLLER_TOKEN, DOCKER_EXECUTOR_TOKEN in .env.
+make setup
 make up
 ```
 
@@ -144,7 +147,7 @@ Order Service. Docker-образ frontend подменяет только `confi
 добавлять в Git или заполнять реальными production-секретами:
 
 ```bash
-cp .env.example .env
+make setup
 ```
 
 Для запуска User Service непосредственно на хосте `DATABASE_URL` должен

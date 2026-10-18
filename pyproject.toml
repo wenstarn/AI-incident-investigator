@@ -30,4 +30,5 @@ testpaths = [
     "services/diagnostic-tools/tests",
     "services/user-service/tests",
     "services/order-service/tests",
+    "tests",
 ]

@@ -1,9 +1,12 @@
-.PHONY: install lint format test smoke-test db-up db-down redis-up redis-down db-migrate db-revision order-db-migrate order-db-revision order-db-seed run-user run-order run-frontend up down build logs ps incident-list incident-activate incident-status incident-reset incident-logs incident-test
+.PHONY: setup install lint format test smoke-test db-up db-down redis-up redis-down db-migrate db-revision order-db-migrate order-db-revision order-db-seed run-user run-order run-frontend up down build logs ps incident-list incident-activate incident-status incident-reset incident-logs incident-test
 
 ifneq (,$(wildcard ./.env))
 include .env
 export
 endif
+
+setup:
+	@python3 scripts/setup_env.py
 
 install:
 	uv sync --all-packages
