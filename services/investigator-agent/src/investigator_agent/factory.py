@@ -2,16 +2,19 @@
 
 from investigator_agent.config import AgentConfig
 from investigator_agent.llm import LLMClient
+from investigator_agent.llm_only import LLMOnly
 from investigator_agent.mas.system import MultiAgentSystem
 from investigator_agent.single_agent import SingleAgent
 from investigator_agent.tools import ToolRegistry
 
-SYSTEMS = ("single", "mas")
+SYSTEMS = ("llm_only", "single", "mas")
 
 
 def make_investigator(
     name: str, llm: LLMClient, registry: ToolRegistry, config: AgentConfig
-) -> SingleAgent | MultiAgentSystem:
+) -> LLMOnly | SingleAgent | MultiAgentSystem:
+    if name == "llm_only":
+        return LLMOnly(llm)
     if name == "single":
         return SingleAgent(llm, registry, config)
     if name == "mas":

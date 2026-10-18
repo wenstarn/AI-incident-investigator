@@ -1,11 +1,12 @@
 # Агентская часть: одиночный агент и мультиагентная система
 
-Пакет `services/investigator-agent` (`investigator_agent`) расследует инциденты магазина. Есть две системы:
+Пакет `services/investigator-agent` (`investigator_agent`) расследует инциденты магазина. Есть три системы:
 
+- **llm_only** — бейзлайн без инструментов: модель отвечает только по симптому;
 - **single** — одиночный агент (baseline);
 - **mas** — мультиагентная система: Координатор → специалисты → Критик.
 
-Обе системы используют только восемь read-only инструментов из [`diagnostic-tools`](diagnostic-tools.md) и работают с любым OpenAI-совместимым API (chat completions + tool calling). Агентных фреймворков нет: цикл вызова инструментов — около 200 строк в `loop.py`, его легко читать и отлаживать.
+Агенты single и mas используют только восемь read-only инструментов из [`diagnostic-tools`](diagnostic-tools.md) и работают с любым OpenAI-совместимым API (chat completions + tool calling). Агентных фреймворков нет: цикл вызова инструментов — около 200 строк в `loop.py`, его легко читать и отлаживать.
 
 Агенты **не имеют доступа к Incident Controller**. Им недоступны ID инцидента, управление Docker, shell, произвольный SQL и произвольные URL. Единственный вход — текст симптома.
 
@@ -87,6 +88,16 @@ make agent-console        # http://127.0.0.1:3010
 | `recommendation`, `summary`, `confidence` | Текст на русском и уверенность 0..1 |
 
 Пример: для неверного порта Redis в Order Service ожидается `dependency_misconfiguration / order-service -> redis`, а не `component_down / redis`.
+
+## Только LLM (бейзлайн без инструментов)
+
+```text
+symptom ──> [llm-only: только submit_report] ──> IncidentReport
+```
+
+Модель получает тот же симптом, описание системы (`SYSTEM_TOPOLOGY`) и правила отчёта, что и одиночный агент, но без инструментов и без заметок о них. Она сразу вызывает `submit_report`; после ошибки валидации есть одна повторная попытка. От single эта система отличается только отсутствием инструментов, поэтому сравнение с ней показывает, что дают инструменты.
+
+У пар кейсов с одинаковым симптомом (INC-001 и INC-004, INC-002 и INC-006) правильные ответы разные, а вход у LLM Only одинаковый. Поэтому в среднем она верно решает не больше половины каждой пары, а с `GENERIC=1` — не больше 1/7 кейсов.
 
 ## Одиночный агент
 
@@ -175,7 +186,7 @@ symptom ──> [single-investigator: 8 инструментов + submit_report
 `make agent-eval-report` собирает все прогоны из `eval-results/` в один файл `eval-results/REPORT.md`. В нём сводная таблица, сравнение MAS с одиночным агентом, список всех ошибок и подробности по кейсам. Все цифры вычисляются из `scores.json`. Чтобы положить отчёт в репозиторий, укажите путь: `make agent-eval-report OUT=docs/evaluation-results.md`.
 
 ```sh
-make agent-eval-replay REPEATS=3                       # обе системы, все кейсы
+make agent-eval-replay REPEATS=3                       # все три системы, все кейсы
 make agent-eval-replay SYSTEMS=single CASES=INC-002,INC-006
 make agent-eval-live REPEATS=1                         # разрушительно!
 ```
