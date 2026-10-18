@@ -11,6 +11,8 @@ members = [
     "services/order-service",
     "services/shared",
     "services/diagnostic-tools",
+    "services/investigator-agent",
+    "services/agent-console",
 ]
 
 [tool.ruff]
@@ -28,6 +30,8 @@ markers = [
 testpaths = [
     "services/shared/tests",
     "services/diagnostic-tools/tests",
+    "services/investigator-agent/tests",
+    "services/agent-console/tests",
     "services/user-service/tests",
     "services/order-service/tests",
     "tests",

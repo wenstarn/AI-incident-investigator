@@ -1,4 +1,4 @@
-.PHONY: setup install lint format test smoke-test db-up db-down redis-up redis-down db-migrate db-revision order-db-migrate order-db-revision order-db-seed run-user run-order run-frontend up down build logs ps incident-list incident-activate incident-status incident-reset incident-logs incident-test
+.PHONY: setup install lint format test smoke-test db-up db-down redis-up redis-down db-migrate db-revision order-db-migrate order-db-revision order-db-seed run-user run-order run-frontend up down build logs ps incident-list incident-activate incident-status incident-reset incident-logs incident-test diagnostic-test diagnostic-test-advanced agent-investigate agent-eval-replay agent-eval-live agent-replay-fidelity agent-console agent-eval-report
 
 ifneq (,$(wildcard ./.env))
 include .env
@@ -108,3 +108,30 @@ diagnostic-test:
 diagnostic-test-advanced:
 	@echo 'WARNING: advanced diagnostic tests activate INC-004 through INC-006.'
 	docker compose --profile diagnostic-test run --build --rm diagnostic-test-runner python tests/diagnostic_advanced_integration.py
+
+# Investigator agents need LLM_* settings in .env (see docs/agent.md).
+agent-investigate:
+	@test -n "$(SYMPTOM)" || { echo 'Usage: make agent-investigate SYMPTOM="..." [SYSTEM=single|mas] [REPLAY=INC-004|healthy]' >&2; exit 1; }
+	uv run --package investigator-agent investigate "$(SYMPTOM)" --system $(or $(SYSTEM),single) $(if $(REPLAY),--replay $(REPLAY))
+
+# Replay evaluation uses recorded incident worlds: no Docker, real LLM.
+agent-eval-replay:
+	uv run --package investigator-agent investigator-eval --mode replay --repeats $(or $(REPEATS),1) $(if $(SYSTEMS),--systems $(SYSTEMS)) $(if $(CASES),--cases $(CASES)) $(if $(GENERIC),--generic-symptom)
+
+# Live evaluation is destructive and remains opt-in.
+agent-eval-live:
+	@echo 'WARNING: live agent evaluation activates INC-001 through INC-006 one by one.'
+	uv run --package investigator-agent investigator-eval --mode live --confirm-destructive --repeats $(or $(REPEATS),1) $(if $(SYSTEMS),--systems $(SYSTEMS)) $(if $(CASES),--cases $(CASES)) $(if $(GENERIC),--generic-symptom)
+
+# Compares replay worlds with the live stack; destructive, no LLM needed.
+agent-replay-fidelity:
+	@echo 'WARNING: replay fidelity check activates INC-001 through INC-006 one by one.'
+	uv run --package investigator-agent investigator-eval --mode fidelity --confirm-destructive $(if $(CASES),--cases $(CASES))
+
+# Real-time web console for the agents: http://127.0.0.1:3010
+agent-console:
+	uv run --package agent-console agent-console
+
+# One Markdown summary of every run in eval-results/ (computed from scores.json).
+agent-eval-report:
+	uv run --package investigator-agent investigator-eval --mode report $(if $(OUT),--report-out $(OUT))

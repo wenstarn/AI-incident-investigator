@@ -1,0 +1,20 @@
+[project]
+name = "agent-console"
+version = "0.1.0"
+description = "Real-time web console for the incident investigation agents"
+requires-python = ">=3.12"
+dependencies = [
+    "investigator-agent",
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.34,<1",
+]
+
+[project.scripts]
+agent-console = "agent_console.main:run"
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+investigator-agent = { workspace = true }

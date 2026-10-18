@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent Console</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">AI Incident Investigator</p>
+        <h1>Agent Console</h1>
+      </div>
+      <div class="header-meta">
+        <span id="model-badge" class="badge">модель: …</span>
+        <span id="incident-badge" class="badge">инцидент: …</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel">
+        <section class="block">
+          <h2>1. Сбой</h2>
+          <p class="hint">Включает тестовый инцидент на живом стенде и отправляет запросы «пользователей», чтобы симптом появился в логах.</p>
+          <select id="incident-select" aria-label="Инцидент"></select>
+          <div class="row">
+            <button id="break-button" class="danger" type="button">Сломать</button>
+            <button id="repair-button" type="button">Починить</button>
+          </div>
+          <p id="incident-status" class="status" role="status"></p>
+        </section>
+
+        <section class="block">
+          <h2>2. Расследование</h2>
+          <p class="hint">Агент расследует живой стенд, видя только текст симптома.</p>
+          <label class="field">
+            Готовый симптом
+            <select id="preset-select"></select>
+          </label>
+          <label class="field">
+            Симптом (только это увидит агент)
+            <textarea id="symptom" rows="4" maxlength="2000"></textarea>
+          </label>
+          <fieldset class="segmented">
+            <legend>Система</legend>
+            <label><input type="radio" name="system" value="single" checked /> одиночный агент</label>
+            <label><input type="radio" name="system" value="mas" /> MAS</label>
+          </fieldset>
+          <button id="start-button" class="primary" type="button">Расследовать</button>
+        </section>
+
+        <section class="block">
+          <h2>Повтор сохранённых</h2>
+          <div class="row">
+            <label class="field inline">
+              Скорость
+              <select id="speed-select">
+                <option value="1">×1 (реальное время)</option>
+                <option value="4" selected>×4</option>
+                <option value="16">×16</option>
+                <option value="100">×100</option>
+              </select>
+            </label>
+            <button id="refresh-traces" type="button">Обновить</button>
+          </div>
+          <ul id="trace-list" class="trace-list"></ul>
+        </section>
+      </aside>
+
+      <section class="stage">
+        <div class="run-header">
+          <h2 id="run-title">Здесь появится ход расследования</h2>
+          <p id="run-meta" class="status"></p>
+        </div>
+        <div id="lanes" class="lanes"></div>
+        <section id="result" class="result" hidden></section>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

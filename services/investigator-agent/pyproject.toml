@@ -1,0 +1,21 @@
+[project]
+name = "investigator-agent"
+version = "0.1.0"
+description = "Single-agent and multi-agent incident investigators for AI Incident Investigator"
+requires-python = ">=3.12"
+dependencies = [
+    "diagnostic-tools",
+    "httpx>=0.28,<1",
+    "pydantic>=2.10,<3",
+]
+
+[project.scripts]
+investigate = "investigator_agent.cli:main"
+investigator-eval = "investigator_agent.evaluation.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+diagnostic-tools = { workspace = true }
