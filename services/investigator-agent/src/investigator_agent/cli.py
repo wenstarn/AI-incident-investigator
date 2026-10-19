@@ -37,7 +37,10 @@ def format_result(result: InvestigationResult) -> str:
         f"dependency={report.dependency}, confidence={report.confidence:.2f})",
         f"Кратко: {report.summary}",
         "Доказательства:",
-        *[f"  - [{item.tool}] {item.observation}" for item in report.evidence],
+        *(
+            [f"  - [{item.tool}] {item.observation}" for item in report.evidence]
+            or ["  нет"]
+        ),
     ]
     if report.ruled_out:
         lines += ["Исключено:", *[f"  - {item}" for item in report.ruled_out]]
@@ -48,6 +51,8 @@ def format_result(result: InvestigationResult) -> str:
         lines.append(
             f"  - {record.agent}: {record.tool}({record.arguments}) -> {record.status}"
         )
+    if not result.tool_calls:
+        lines.append("  нет")
     lines.append(
         f"LLM-вызовов: {result.llm_calls}, токенов: {result.usage.total_tokens}, "
         f"время: {result.duration_s} с"

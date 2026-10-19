@@ -4,7 +4,8 @@ The single agent and the multi-agent system receive the same knowledge blocks,
 so a comparison between them measures the effect of structure, not of extra
 hints. The blocks describe the system and the tools; they never name test
 scenarios or their identifiers. Each block is a candidate document for a future
-RAG corpus.
+RAG corpus. The LLM Only baseline has no tools and gets only SYSTEM_TOPOLOGY and
+REPORT_RULES.
 """
 
 SYSTEM_TOPOLOGY = """\

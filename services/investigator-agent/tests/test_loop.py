@@ -3,7 +3,7 @@ import json
 
 from investigator_agent.evaluation.replay import ReplayWorld
 from investigator_agent.llm import LLMError
-from investigator_agent.loop import run_tool_loop
+from investigator_agent.loop import FINAL_ONLY_REMINDER, run_tool_loop
 from investigator_agent.report import IncidentReport
 from investigator_agent.single_agent import SUBMIT_REPORT
 from investigator_agent.testing import ScriptedLLM, call, respond
@@ -222,3 +222,20 @@ def test_agent_without_tools_cannot_call_diagnostics():
     assert llm.calls[0]["tools"] == ["submit_report"]
     assert outcome.tool_calls[0].result["error"]["type"] == "tool_not_allowed"
     assert outcome.status == "completed"
+
+
+def test_text_reply_without_tools_gets_final_only_reminder():
+    llm = ScriptedLLM(
+        {
+            ROLE: [
+                respond(content="Скорее всего, остановлен Redis."),
+                respond(call("submit_report", **REPORT)),
+            ]
+        }
+    )
+    outcome = run(llm, registry=None)
+    assert outcome.status == "completed"
+    assert outcome.messages[3] == {
+        "role": "user",
+        "content": FINAL_ONLY_REMINDER.format(final="submit_report"),
+    }

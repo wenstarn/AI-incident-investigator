@@ -59,3 +59,26 @@ def test_factory_and_report_formatting():
     assert "инцидент не обнаружен" in text
     assert "[check_redis] PING ok" in text
     assert "single-investigator: check_redis({}) -> ok" in text
+
+
+def test_llm_only_formatting_without_evidence_and_tools():
+    registry = ToolRegistry(ReplayWorld.named("healthy").backend())
+    llm = ScriptedLLM(
+        {
+            "llm-only": [
+                respond(
+                    call(
+                        "submit_report",
+                        summary="Вероятно, остановлен Redis",
+                        category="component_down",
+                        component="redis",
+                        confidence=0.4,
+                    )
+                )
+            ]
+        }
+    )
+    agent = make_investigator("llm_only", llm, registry, AgentConfig(llm_model="test"))
+    text = format_result(asyncio.run(agent.investigate("Сайт тормозит")))
+    assert "Система: llm_only" in text
+    assert "Доказательства:\n  нет" in text and "Вызовы инструментов:\n  нет" in text

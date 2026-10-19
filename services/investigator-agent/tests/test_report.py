@@ -88,3 +88,17 @@ def test_empty_results_and_file_output(tmp_path):
     assert "Оценок пока нет" in build_report([])
     out = write_report(tmp_path, tmp_path / "REPORT.md")
     assert out.read_text(encoding="utf-8").startswith("# Результаты оценки агентов")
+
+
+def test_llm_only_run_without_mas_comparison(tmp_path):
+    write_run(
+        tmp_path,
+        "20261018T130000Z-replay",
+        "model-a",
+        "replay",
+        [score("INC-002", "llm_only", correct=False)],
+    )
+    report = build_report(load_runs(tmp_path))
+    assert "| model-a | replay | 1 | Только LLM | 0/1 |" in report
+    assert "Нет прогонов, где запускались и single, и MAS." in report
+    assert "| Только LLM | INC-002 | 1 |" in report

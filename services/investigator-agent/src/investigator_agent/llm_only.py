@@ -14,7 +14,8 @@ from investigator_agent.report import (
 )
 from investigator_agent.single_agent import SUBMIT_REPORT, symptom_message
 
-# One answer and one retry after a validation error, as for the critic.
+# As for the critic: an answer and one retry after a validation error; after
+# that the loop forces submit_report at most twice more (status step_limit).
 LLM_ONLY_MAX_STEPS = 2
 
 

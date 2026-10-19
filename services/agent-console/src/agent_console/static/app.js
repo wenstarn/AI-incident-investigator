@@ -3,6 +3,7 @@
 // All data is rendered with textContent: tool output (logs) is untrusted text.
 
 const LANES = {
+  llm_only: [{ id: "llm-only", title: "Только LLM", subtitle: "без инструментов, только симптом" }],
   single: [{ id: "single", title: "Агент", subtitle: "все 8 инструментов" }],
   mas: [
     { id: "coordinator", title: "Координатор", subtitle: "план и итоговый отчёт" },
@@ -43,6 +44,10 @@ async function api(path, options = {}) {
 
 function selected(name) {
   return document.querySelector(`input[name="${name}"]:checked`).value;
+}
+
+function systemLabel(system) {
+  return state.options?.systems.find((s) => s.id === system)?.label || system;
 }
 
 // ---------------------------------------------------------------- options --
@@ -264,7 +269,7 @@ function handleEvent(event) {
     case "investigation_started": {
       buildLanes(event.system);
       $("result").hidden = true;
-      const label = event.system === "mas" ? "Мультиагентная система" : "Одиночный агент";
+      const label = systemLabel(event.system);
       const source = { live: "живой стенд", playback: "повтор" }[state.source] || "";
       $("run-title").textContent = `${label}: идёт расследование`;
       const model = state.model ? ` · модель: ${state.model}` : "";
@@ -348,8 +353,7 @@ function renderResult(summary) {
   const box = $("result");
   box.replaceChildren();
   box.hidden = false;
-  $("run-title").textContent =
-    summary.system === "mas" ? "Мультиагентная система: готово" : "Одиночный агент: готово";
+  $("run-title").textContent = `${systemLabel(summary.system)}: готово`;
   box.append(el("p", "eyebrow", "Итоговый отчёт"));
   box.append(el("h3", null, CATEGORY[report.category] || report.category));
   const target = report.dependency && report.dependency !== "none" ? ` → ${report.dependency}` : "";

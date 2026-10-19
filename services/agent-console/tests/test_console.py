@@ -19,13 +19,22 @@ REPORT = {
 }
 
 
+GUESS = {
+    "summary": "Вероятно, остановлен User Service",
+    "category": "component_down",
+    "component": "user-service",
+    "confidence": 0.5,
+}
+
+
 def scripted(_config):
     return ScriptedLLM(
         {
             "single-investigator": [
                 respond(call("check_redis"), content="Проверю Redis"),
                 respond(call("submit_report", **REPORT)),
-            ]
+            ],
+            "llm-only": [respond(call("submit_report", **GUESS))],
         }
     )
 
@@ -110,7 +119,7 @@ def test_options(setup):
     client, *_ = setup
     options = client.get("/api/options").json()
     assert options["model"] == "test-model" and options["controller"] is True
-    assert [s["id"] for s in options["systems"]] == ["single", "mas"]
+    assert [s["id"] for s in options["systems"]] == ["llm_only", "single", "mas"]
     assert "worlds" not in options and len(options["incidents"]) == 6
     assert any(c["id"] == "healthy" for c in options["cases"])
 
@@ -163,6 +172,21 @@ def test_live_investigation_streams_events_and_is_saved(setup):
     verdict = next(e for e in playback if e["type"] == "evaluation")
     assert verdict["correct"] is True and verdict["case_id"] == "INC-002"
     assert all("t" in event for event in events)
+
+
+def test_llm_only_answers_without_tools(setup):
+    client, controller, _, _ = setup
+    break_stand(controller, "INC-004")
+    response = client.post(
+        "/api/investigations",
+        json={"symptom": "POST /orders отвечает 502", "system": "llm_only"},
+    )
+    events = read_stream(client, f"/api/investigations/{response.json()['id']}/stream")
+    assert not any(event["type"] == "tool_result" for event in events)
+    finished = next(e for e in events if e["type"] == "investigation_finished")
+    assert finished["system"] == "llm_only" and finished["tool_calls"] == 0
+    evaluation = next(e for e in events if e["type"] == "evaluation")
+    assert evaluation["case_id"] == "INC-004" and evaluation["correct"] is False
 
 
 def test_expected_answer_comes_from_active_incident(setup):

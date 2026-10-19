@@ -33,7 +33,7 @@
 
         <section class="block">
           <h2>2. Расследование</h2>
-          <p class="hint">Агент расследует живой стенд, видя только текст симптома.</p>
+          <p class="hint">Система видит только текст симптома: агенты проверяют живой стенд, «только LLM» отвечает без проверок.</p>
           <label class="field">
             Готовый симптом
             <select id="preset-select"></select>
@@ -44,6 +44,7 @@
           </label>
           <fieldset class="segmented">
             <legend>Система</legend>
+            <label><input type="radio" name="system" value="llm_only" /> только LLM</label>
             <label><input type="radio" name="system" value="single" checked /> одиночный агент</label>
             <label><input type="radio" name="system" value="mas" /> MAS</label>
           </fieldset>
