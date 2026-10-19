@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from diagnostic_tools.models import DiagnosticResult
 from investigator_agent.config import AgentConfig
@@ -6,10 +7,14 @@ from investigator_agent.evaluation.cases import CASES_BY_ID
 from investigator_agent.evaluation.replay import ReplayWorld
 from investigator_agent.evaluation.scoring import score
 from investigator_agent.llm import LLMError
-from investigator_agent.mas.models import SPECIALIST_TOOLS
+from investigator_agent.mas.models import (
+    MAX_OBSERVATION_CHARS,
+    SPECIALIST_TOOLS,
+    observation_log,
+)
 from investigator_agent.mas.system import MultiAgentSystem
 from investigator_agent.testing import ScriptedLLM, call, respond
-from investigator_agent.tools import TOOL_SPECS, ToolRegistry
+from investigator_agent.tools import TOOL_SPECS, ToolCallRecord, ToolRegistry
 
 REDIS_PORT_REPORT = {
     "summary": "Order Service использует неверный порт Redis 9999.",
@@ -282,3 +287,40 @@ def test_specialists_run_concurrently():
     result = asyncio.run(system(llm, backend=backend).investigate("symptom"))
     assert sorted(started) == ["check_redis", "get_service_logs"]
     assert all(record.status == "ok" for record in result.tool_calls)
+
+
+def test_observation_log_keeps_newest_log_lines():
+    # Synthesis and the critic see only this log: the newest lines with the
+    # failure events must survive the per-result limit.
+    for world, event in (
+        ("INC-002", "redis_connection_failed"),
+        ("INC-006", "redis_connection_failed"),
+        ("INC-004", "dependency_connection_failed"),
+    ):
+        registry = ToolRegistry(ReplayWorld.named(world).backend())
+        _, record = asyncio.run(
+            registry.execute("get_service_logs", {"service": "order-service"}, "x")
+        )
+        logs = record.result["data"]["logs"]
+        assert len(json.dumps(record.result)) > MAX_OBSERVATION_CHARS
+        line = observation_log([record])
+        result = line.split(" -> ", 1)[1]
+        assert len(result) <= MAX_OBSERVATION_CHARS
+        assert event in result
+        assert logs.splitlines()[-1] in json.loads(result)["data"]["logs"]
+
+
+def test_observation_log_short_and_non_log_results():
+    small = ToolCallRecord(
+        agent="x",
+        tool="check_redis",
+        arguments={},
+        status="ok",
+        result={"tool": "check_redis", "status": "ok", "data": {"ping": True}},
+        duration_ms=1,
+    )
+    assert observation_log([small]).endswith(json.dumps(small.result))
+    big = small.model_copy(
+        update={"result": {"tool": "t", "status": "ok", "data": {"x": "a" * 5000}}}
+    )
+    assert observation_log([big]).endswith("...(truncated)")
