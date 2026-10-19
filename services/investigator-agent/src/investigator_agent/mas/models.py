@@ -1,7 +1,7 @@
 """Messages exchanged between MAS roles."""
 
 import json
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -63,13 +63,29 @@ class SpecialistResult(BaseModel):
     findings: SpecialistFindings | None = None
 
 
+def _clip_result(result: dict[str, Any]) -> str:
+    text = json.dumps(result, ensure_ascii=False)
+    if len(text) <= MAX_OBSERVATION_CHARS:
+        return text
+    data = result.get("data") or {}
+    logs = data.get("logs")
+    if isinstance(logs, str):
+        # Drop the oldest log lines: the newest ones carry the failure events.
+        kept = logs.splitlines()
+        while len(kept) > 1 and len(text) > MAX_OBSERVATION_CHARS:
+            kept.pop(0)
+            clipped = {**data, "logs": "\n".join(kept), "truncated_by_agent": True}
+            text = json.dumps({**result, "data": clipped}, ensure_ascii=False)
+        if len(text) <= MAX_OBSERVATION_CHARS:
+            return text
+    return text[:MAX_OBSERVATION_CHARS] + "...(truncated)"
+
+
 def observation_log(records: list[ToolCallRecord]) -> str:
     lines = []
     for number, record in enumerate(records, start=1):
         arguments = json.dumps(record.arguments, ensure_ascii=False)
-        result = json.dumps(record.result, ensure_ascii=False)
-        if len(result) > MAX_OBSERVATION_CHARS:
-            result = result[:MAX_OBSERVATION_CHARS] + "...(truncated)"
+        result = _clip_result(record.result)
         lines.append(
             f"#{number} [{record.agent}] {record.tool}({arguments}) -> {result}"
         )
