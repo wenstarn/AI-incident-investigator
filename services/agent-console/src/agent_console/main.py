@@ -68,7 +68,7 @@ CSRF_HEADER = "X-Agent-Console"
 
 class InvestigationRequest(BaseModel):
     symptom: str = Field(min_length=3, max_length=2000)
-    system: Literal["single", "mas"] = "single"
+    system: Literal["llm_only", "single", "mas"] = "single"
 
 
 class Settings(BaseModel):
@@ -125,6 +125,7 @@ def create_app(
             "model": config.llm_model or None,
             "controller": bool(os.getenv("INCIDENT_CONTROLLER_TOKEN")),
             "systems": [
+                {"id": "llm_only", "label": "Только LLM"},
                 {"id": "single", "label": "Одиночный агент"},
                 {"id": "mas", "label": "Мультиагентная система"},
             ],

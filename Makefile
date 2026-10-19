@@ -111,7 +111,7 @@ diagnostic-test-advanced:
 
 # Investigator agents need LLM_* settings in .env (see docs/agent.md).
 agent-investigate:
-	@test -n "$(SYMPTOM)" || { echo 'Usage: make agent-investigate SYMPTOM="..." [SYSTEM=single|mas] [REPLAY=INC-004|healthy]' >&2; exit 1; }
+	@test -n "$(SYMPTOM)" || { echo 'Usage: make agent-investigate SYMPTOM="..." [SYSTEM=llm_only|single|mas] [REPLAY=INC-004|healthy]' >&2; exit 1; }
 	uv run --package investigator-agent investigate "$(SYMPTOM)" --system $(or $(SYSTEM),single) $(if $(REPLAY),--replay $(REPLAY))
 
 # Replay evaluation uses recorded incident worlds: no Docker, real LLM.

@@ -1,4 +1,4 @@
-"""Shared tool-calling loop used by the single agent and by every MAS role.
+"""Shared tool-calling loop used by the single agent, LLM Only and every MAS role.
 
 An agent finishes by calling its *final tool* (for example ``submit_report``).
 The final tool's arguments are validated by a Pydantic model; validation errors
@@ -27,6 +27,8 @@ NO_TOOL_CALL_REMINDER = (
     "Respond only with tool calls. Use the diagnostic tools to gather evidence, "
     "then call {final} with your conclusion."
 )
+# For roles without diagnostic tools (LLM Only, synthesis, critic).
+FINAL_ONLY_REMINDER = "Respond only with a call to {final}."
 STEPS_WARNING_AT = 2
 STEPS_WARNING = (
     "Only {remaining} steps are left. Stop exploring unless a check can change "
@@ -233,11 +235,9 @@ async def _run_tool_loop(
                     outcome.final = final
                     outcome.status = "completed"
                     return outcome
+            reminder = NO_TOOL_CALL_REMINDER if registry.names else FINAL_ONLY_REMINDER
             messages.append(
-                {
-                    "role": "user",
-                    "content": NO_TOOL_CALL_REMINDER.format(final=final_tool.name),
-                }
+                {"role": "user", "content": reminder.format(final=final_tool.name)}
             )
             continue
         diagnostic_calls = [c for c in response.tool_calls if c.name != final_tool.name]

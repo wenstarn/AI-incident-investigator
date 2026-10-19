@@ -219,7 +219,7 @@ class ResultWriter:
             file.write(json.dumps(record, ensure_ascii=False) + "\n")
         mark = "OK " if item.correct else ("~  " if item.partial else "X  ")
         print(
-            f"{mark} {item.system:6} {case.id:8} #{repeat}: {item.predicted} "
+            f"{mark} {item.system:8} {case.id:8} #{repeat}: {item.predicted} "
             f"(expected {item.expected}); tools={item.tool_calls} "
             f"tokens={item.tokens} {item.duration_s}s",
             flush=True,

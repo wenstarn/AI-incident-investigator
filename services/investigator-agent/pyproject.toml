@@ -1,7 +1,7 @@
 [project]
 name = "investigator-agent"
 version = "0.1.0"
-description = "Single-agent and multi-agent incident investigators for AI Incident Investigator"
+description = "LLM Only baseline, single-agent and multi-agent incident investigators for AI Incident Investigator"
 requires-python = ">=3.12"
 dependencies = [
     "diagnostic-tools",

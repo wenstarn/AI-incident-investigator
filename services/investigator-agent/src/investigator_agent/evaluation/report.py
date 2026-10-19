@@ -109,25 +109,28 @@ def build_report(runs: list[EvalRun], generated_at: datetime | None = None) -> s
                 )
             )
 
-    lines += [
-        "",
-        "## 2. MAS против одиночного агента",
-        "",
-        "| Прогон | Модель · режим | Точность single | Точность MAS "
-        "| Токены MAS / single | Время MAS / single |",
-        "|---|---|---|---|---|---|",
-    ]
+    comparison = []
     for run in runs:
         systems = _by_system(run)
         if not {"single", "mas"} <= set(systems):
             continue
         single, mas = systems["single"], systems["mas"]
-        lines.append(
+        comparison.append(
             f"| {run.name} | {run.label} "
             f"| {single['correct']}/{single['runs']} | {mas['correct']}/{mas['runs']} "
             f"| {_ratio(mas['tokens'], single['tokens'])} "
             f"| {_ratio(mas['duration_s'], single['duration_s'])} |"
         )
+    lines += ["", "## 2. MAS против одиночного агента", ""]
+    if comparison:
+        lines += [
+            "| Прогон | Модель · режим | Точность single | Точность MAS "
+            "| Токены MAS / single | Время MAS / single |",
+            "|---|---|---|---|---|---|",
+            *comparison,
+        ]
+    else:
+        lines.append("Нет прогонов, где запускались и single, и MAS.")
 
     errors = [
         (run, score) for run in runs for score in run.scores if not score["correct"]
@@ -149,8 +152,8 @@ def build_report(runs: list[EvalRun], generated_at: datetime | None = None) -> s
         lines += [
             "",
             "Полный ход каждого ошибочного расследования — в "
-            "`eval-results/<прогон>/investigations.jsonl` и в Agent Console "
-            "(«Повтор сохранённых», отмечены ✗).",
+            "`eval-results/<прогон>/investigations.jsonl`; расследования live-прогонов "
+            "есть и в Agent Console («Повтор сохранённых», отмечены ✗).",
         ]
     else:
         lines.append("Ошибок нет.")

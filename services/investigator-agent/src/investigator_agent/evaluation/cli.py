@@ -1,4 +1,4 @@
-"""Command line for replay and live evaluations of single agent vs MAS."""
+"""Command line for replay and live evaluations of LLM Only, single agent and MAS."""
 
 import argparse
 import asyncio
@@ -143,7 +143,12 @@ def main() -> None:
             "report builds one Markdown summary of all runs in --out-dir"
         ),
     )
-    parser.add_argument("--systems", type=_list, default=list(SYSTEMS))
+    parser.add_argument(
+        "--systems",
+        type=_list,
+        default=list(SYSTEMS),
+        help=f"Comma-separated subset of: {', '.join(SYSTEMS)}",
+    )
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument(
         "--cases",

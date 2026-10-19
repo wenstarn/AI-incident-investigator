@@ -69,3 +69,10 @@ def test_llm_failure_gives_inconclusive_report():
     result = asyncio.run(investigator(ScriptedLLM({})).investigate("symptom"))
     assert result.status == "llm_error" and result.error
     assert result.report.category == "unknown" and result.report.confidence == 0
+
+
+def test_step_limit_after_two_retries_gives_unknown():
+    llm = ScriptedLLM({ROLE: [respond(call("submit_report", category="broken"))] * 4})
+    result = asyncio.run(investigator(llm).investigate("symptom"))
+    assert result.status == "step_limit" and result.llm_calls == 4
+    assert result.report.category == "unknown"
